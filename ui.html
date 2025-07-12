@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Misinformation Detection Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/react@18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/react-dom@18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</head>
+<body class="bg-gray-100 font-sans">
+  <div id="root"></div>
+
+<script type="text/babel" data-presets="react">
+    const App = () => {
+      const [posts, setPosts] = React.useState([]);
+      const [loading, setLoading] = React.useState(false);
+      const [error, setError] = React.useState(null);
+          const [metrics, setMetrics] = React.useState({
+            totalPosts: 0,
+            avgDetectionTime: 0,
+            misinformationCount: 0,
+            trustworthyCount: 0
+          });
+      const [responseHistory, setResponseHistory] = React.useState([]);
+
+      const fetchAndAnalyzePosts = async () => {
+        setLoading(true);
+        setError(null);
+        try {
+          // Use GET to match server
+          const response = await fetch('http://localhost:5000/analyze', {
+            method: 'GET'
+          });
+          const data = await response.json();
+
+          if (data.error) {
+            setError(data.error);
+            setPosts([]);
+            setMetrics({
+              totalPosts: 0,
+              avgDetectionTime: 0,
+              misinformationCount: 0
+            });
+            setResponseHistory(prev => [...prev, data]);
+          } else {
+            const results = Array.isArray(data.results) ? data.results : [];
+            setPosts(results);
+            setMetrics({
+  totalPosts: results.length,
+  avgDetectionTime: results.length > 0
+    ? (results.reduce((sum, r) => sum + (r.detectionTime || 0), 0) / results.length).toFixed(2)
+    : 0,
+  misinformationCount: results.filter(r => r.prediction === 'Misinformation').length,
+  trustworthyCount: results.filter(r => r.prediction === 'Trustworthy').length
+});
+            setResponseHistory(prev => [...prev, data]);
+          }
+        } catch (err) {
+          setError('🚫 Failed to fetch or analyze posts');
+          console.error('Fetch error:', err);
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      return (
+        <div className="container mx-auto p-6">
+          <h1 className="text-4xl font-extrabold text-center mb-8 text-blue-800">🧠 Misinformation Detection Dashboard</h1>
+
+          <div className="flex justify-center mb-6">
+            <button
+              onClick={fetchAndAnalyzePosts}
+              disabled={loading}
+              className="bg-blue-600 hover:bg-blue-700 text-white font-medium px-6 py-2 rounded-md shadow transition disabled:opacity-50"
+            >
+              {loading ? 'Analyzing...' : 'Analyze Facebook Posts'}
+            </button>
+          </div>
+
+          {error && (
+            <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-6 rounded shadow">
+              <p>{error}</p>
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+            <div className="bg-white p-6 rounded-lg shadow flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-700">Total Posts</h2>
+                <p className="text-3xl font-bold text-blue-700">{metrics.totalPosts}</p>
+              </div>
+              <span className="text-4xl">📝</span>
+            </div>
+            <div className="bg-white p-6 rounded-lg shadow flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-600">Trustworthy Posts</h2>
+                <p className="text-3xl font-bold text-yellow-600">{metrics.trustworthyCount}</p>
+              </div>
+              <span className="text-4xl">⏱️</span>
+            </div>
+            <div className="bg-white p-6 rounded-lg shadow flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-700">Misinformation Posts</h2>
+                <p className="text-3xl font-bold text-red-600">{metrics.misinformationCount}</p>
+              </div>
+              <span className="text-4xl">🚨</span>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-lg shadow overflow-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-100">
+                <tr>
+                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-600">Post</th>
+                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-600">Prediction</th>
+                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-600">Timestamp</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200">
+                {posts.map((post, index) => (
+                  <tr key={index}>
+                    <td className="px-6 py-4 text-sm text-gray-700 max-w-xs overflow-hidden overflow-ellipsis whitespace-nowrap">
+                      {post.post && post.post.length > 120 ? post.post.slice(0, 120) + '...' : post.post}
+                    </td>
+                    <td className={`px-6 py-4 text-sm font-medium ${post.prediction === 'Misinformation' ? 'text-red-600' : 'text-green-600'}`}>
+                      {post.prediction}
+                    </td>
+                    <td className="px-6 py-4 text-sm text-gray-500">{post.timestamp}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {loading && (
+            <div className="flex justify-center mt-6">
+              <div className="animate-spin rounded-full h-10 w-10 border-t-4 border-blue-500"></div>
+            </div>
+          )}
+        </div>
+      );
+    };
+
+    ReactDOM.render(<App />, document.getElementById('root'));
+  </script>
+</body>
+</html>
